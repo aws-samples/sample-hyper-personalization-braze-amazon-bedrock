@@ -105,20 +105,6 @@ class BrazeCdkStack(Stack):
             advanced_security_mode=cognito.AdvancedSecurityMode.ENFORCED
         )
 
-        # Create User Pool Client
-        user_pool_client = user_pool.add_client("BrazeApiClient",
-            generate_secret=True,
-            auth_flows=cognito.AuthFlow(
-                user_password=True,
-                user_srp=True
-            ),
-            o_auth=cognito.OAuthSettings(
-                flows=cognito.OAuthFlows(
-                    client_credentials=True
-                ),
-                scopes=[cognito.OAuthScope.custom("braze-api/read")]
-            )
-        )
 
         # Create API Gateway
         # Create log group for API Gateway access logs
@@ -127,35 +113,6 @@ class BrazeCdkStack(Stack):
             retention=logs.RetentionDays.ONE_MONTH
         )
 
-        # Create WAFv2 Web ACL
-        web_acl = wafv2.CfnWebACL(
-            self, "ApiWAF",
-            default_action=wafv2.CfnWebACL.DefaultActionProperty(allow={}),
-            scope="REGIONAL",
-            visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                cloud_watch_metrics_enabled=True,
-                metric_name="ApiWafMetrics",
-                sampled_requests_enabled=True
-            ),
-            rules=[
-                wafv2.CfnWebACL.RuleProperty(
-                    name="LimitRequests",
-                    priority=1,
-                    statement=wafv2.CfnWebACL.StatementProperty(
-                        rate_based_statement=wafv2.CfnWebACL.RateBasedStatementProperty(
-                            limit=2000,
-                            aggregate_key_type="IP"
-                        )
-                    ),
-                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                        cloud_watch_metrics_enabled=True,
-                        metric_name="LimitRequestsRule",
-                        sampled_requests_enabled=True
-                    ),
-                    override_action=wafv2.CfnWebACL.OverrideActionProperty(none={})
-                )
-            ]
-        )
 
         # Create Cognito Authorizer
         auth = apigateway.CognitoUserPoolsAuthorizer(
@@ -175,14 +132,6 @@ class BrazeCdkStack(Stack):
             )
         )
 
-       
-        
-        # Associate WAF WebACL with the API Gateway stage
-        wafv2.CfnWebACLAssociation(
-            self, "ApiWafAssociation",
-            resource_arn=f"arn:aws:apigateway:{self.region}:{self.account}:/restapis/{api.rest_api_id}/stages/prod",
-            web_acl_arn=web_acl.attr_arn
-        )
 
         # Create integration with DynamoDB
         dynamo_integration = apigateway.AwsIntegration(
